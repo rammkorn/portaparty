@@ -88,18 +88,50 @@
 
   <script>
     // Inizializzazione
-    let event = JSON.parse(localStorage.getItem('event')) || null;
-    let contributions = JSON.parse(localStorage.getItem('contributions')) || [];
+    let event = null;
+    let contributions = [];
     const categories = ['Intrattenimento', 'Posateria', 'Antipasti', 'Primi', 'Secondi', 'Dolci/Frutta', 'Bevande'];
     const correctPassword = 'TuttiIFruttiSummerLove';
-    let editingContributionEmail = null; // Tiene traccia dell'email del contributo in modifica
+    let editingContributionEmail = null;
 
-    // Carica evento e contributi all'avvio
-    if (event) {
-      document.getElementById('eventDetails').classList.remove('hidden');
-      document.getElementById('eventInfo').innerText = `${event.name} | ${event.date} | ${event.location} | ${event.guests} ospiti`;
+    // Carica dati all'avvio
+    async function loadData() {
+      try {
+        const response = await fetch('/.netlify/functions/get-data');
+        if (!response.ok) {
+          throw new Error('Errore caricamento dati');
+        }
+        const data = await response.json();
+        event = data.event || null;
+        contributions = data.contributions || [];
+        if (event) {
+          document.getElementById('eventDetails').classList.remove('hidden');
+          document.getElementById('eventInfo').innerText = `${event.name} | ${event.date} | ${event.location} | ${event.guests} ospiti`;
+        }
+        renderContributions();
+      } catch (error) {
+        console.error('Errore caricamento dati:', error);
+        alert('Impossibile caricare i dati. Assicurati che il server sia attivo.');
+      }
     }
-    renderContributions();
+    loadData();
+
+    // Salva dati
+    async function saveData() {
+      try {
+        const response = await fetch('/.netlify/functions/update-data', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ event, contributions })
+        });
+        if (!response.ok) {
+          throw new Error('Errore salvataggio dati');
+        }
+      } catch (error) {
+        console.error('Errore salvataggio dati:', error);
+        alert('Impossibile salvare i dati. Controlla il server.');
+      }
+    }
 
     // Sblocca form evento
     function unlockEventForm() {
@@ -122,7 +154,7 @@
     }
 
     // Salva evento
-    function saveEvent() {
+    async function saveEvent() {
       const name = document.getElementById('eventName').value;
       const date = document.getElementById('eventDate').value;
       const location = document.getElementById('eventLocation').value;
@@ -134,7 +166,7 @@
       }
 
       event = { name, date, location, guests };
-      localStorage.setItem('event', JSON.stringify(event));
+      await saveData();
       document.getElementById('eventDetails').classList.remove('hidden');
       document.getElementById('eventInfo').innerText = `${name} | ${date} | ${location} | ${guests} ospiti`;
       document.getElementById('eventFormSection').classList.add('hidden');
@@ -166,14 +198,13 @@
         document.getElementById('contribution').value = contribution.contribution;
         document.getElementById('vegan').checked = contribution.vegan;
         document.getElementById('glutenFree').checked = contribution.glutenFree;
-        // Nota: non si può prepopolare il campo file per motivi di sicurezza del browser
       } else {
         emailError.classList.remove('hidden');
       }
     }
 
     // Aggiungi o modifica contributo
-    function addOrUpdateContribution() {
+    async function addOrUpdateContribution() {
       const email = document.getElementById('userEmail').value;
       const name = document.getElementById('userName').value;
       const category = document.getElementById('category').value;
@@ -187,16 +218,14 @@
         return;
       }
 
-      // Gestione foto
-      const handleContribution = (photo) => {
+      const handleContribution = async (photo) => {
         if (editingContributionEmail) {
-          // Modifica contributo esistente
           const index = contributions.findIndex(c => c.email === editingContributionEmail);
           if (index !== -1) {
             contributions[index] = {
               email,
               name,
-              photo: photo || contributions[index].photo, // Mantieni la foto esistente se non caricata
+              photo: photo || contributions[index].photo,
               category,
               contribution,
               vegan,
@@ -207,10 +236,9 @@
           document.getElementById('contributionFormTitle').innerText = 'Aggiungi il tuo Contributo';
           document.getElementById('contributionButton').innerText = 'Aggiungi Contributo';
         } else {
-          // Aggiungi nuovo contributo
           contributions.push({ email, name, photo: photo || 'https://via.placeholder.com/40', category, contribution, vegan, glutenFree });
         }
-        localStorage.setItem('contributions', JSON.stringify(contributions));
+        await saveData();
         renderContributions();
         resetContributionForm();
       };
@@ -222,7 +250,7 @@
         };
         reader.readAsDataURL(photoInput.files[0]);
       } else {
-        handleContribution();
+        await handleContribution();
       }
     }
 
