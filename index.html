@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Porta Party Organizer</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body { font-family: 'Inter', sans-serif; }
+    .category-section { margin-top: 2rem; }
+    .contribution-card { transition: all 0.3s ease; }
+    .contribution-card:hover { transform: translateY(-2px); }
+  </style>
+</head>
+<body class="bg-gray-100 min-h-screen p-4">
+  <div class="max-w-4xl mx-auto bg-white rounded-lg shadow-lg p-6">
+    <h1 class="text-3xl font-bold text-center text-indigo-600 mb-6">Porta Party Organizer</h1>
+
+    <!-- Form Password -->
+    <div id="passwordSection" class="mb-8">
+      <h2 class="text-xl font-semibold text-gray-800 mb-4">Sblocca Creazione/Modifica Evento</h2>
+      <div class="flex gap-4">
+        <input id="passwordInput" type="password" placeholder="Inserisci la password" class="border rounded-lg p-2 w-full">
+        <button onclick="unlockEventForm()" class="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700">Sblocca</button>
+      </div>
+      <p id="passwordError" class="text-red-500 hidden mt-2">Password errata!</p>
+    </div>
+
+    <!-- Form Creazione/Modifica Evento -->
+    <div id="eventFormSection" class="mb-8 hidden">
+      <h2 id="eventFormTitle" class="text-xl font-semibold text-gray-800 mb-4">Crea Evento</h2>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <input id="eventName" type="text" placeholder="Nome Evento" class="border rounded-lg p-2 w-full">
+        <input id="eventDate" type="date" class="border rounded-lg p-2 w-full">
+        <input id="eventLocation" type="text" placeholder="Luogo" class="border rounded-lg p-2 w-full">
+        <input id="eventGuests" type="number" placeholder="Numero Ospiti" min="1" class="border rounded-lg p-2 w-full">
+      </div>
+      <button id="saveEventButton" onclick="saveEvent()" class="mt-4 bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700">Salva Evento</button>
+    </div>
+
+    <!-- Dettagli Evento -->
+    <div id="eventDetails" class="hidden mb-8 p-4 bg-indigo-50 rounded-lg">
+      <h2 class="text-xl font-semibold text-gray-800">Dettagli Evento</h2>
+      <p id="eventInfo" class="text-gray-700"></p>
+    </div>
+
+    <!-- Form Verifica Email per Modifica Contributo -->
+    <div id="emailVerificationSection" class="mb-8 hidden">
+      <h2 class="text-xl font-semibold text-gray-800 mb-4">Verifica Email per Modifica</h2>
+      <div class="flex gap-4">
+        <input id="verifyEmailInput" type="email" placeholder="Inserisci l'email del contributo" class="border rounded-lg p-2 w-full">
+        <button onclick="verifyEmailForEdit()" class="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700">Verifica</button>
+      </div>
+      <p id="emailError" class="text-red-500 hidden mt-2">Email non valida o non corrispondente!</p>
+    </div>
+
+    <!-- Form Contributo -->
+    <div class="mb-8">
+      <h2 id="contributionFormTitle" class="text-xl font-semibold text-gray-800 mb-4">Aggiungi il tuo Contributo</h2>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <input id="userEmail" type="email" placeholder="La tua Email" class="border rounded-lg p-2 w-full">
+        <input id="userName" type="text" placeholder="Il tuo Nome" class="border rounded-lg p-2 w-full">
+        <input id="userPhoto" type="file" accept="image/*" class="border rounded-lg p-2 w-full">
+        <select id="category" class="border rounded-lg p-2 w-full">
+          <option value="Intrattenimento">Intrattenimento</option>
+          <option value="Posateria">Posateria</option>
+          <option value="Antipasti">Antipasti</option>
+          <option value="Primi">Primi</option>
+          <option value="Secondi">Secondi</option>
+          <option value="Dolci/Frutta">Dolci/Frutta</option>
+          <option value="Bevande">Bevande</option>
+        </select>
+        <input id="contribution" type="text" placeholder="Cosa porti?" class="border rounded-lg p-2 w-full">
+        <div class="flex items-center gap-4">
+          <label><input id="vegan" type="checkbox"> Vegano</label>
+          <label><input id="glutenFree" type="checkbox"> Adatto a celiaci</label>
+        </div>
+      </div>
+      <button id="contributionButton" onclick="addOrUpdateContribution()" class="mt-4 bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700">Aggiungi Contributo</button>
+    </div>
+
+    <!-- Lista Contributi -->
+    <div id="contributions">
+      <h2 class="text-xl font-semibold text-gray-800 mb-4">Contributi</h2>
+      <div id="contributionList" class="grid grid-cols-1 gap-4"></div>
+    </div>
+  </div>
+
+  <script>
+    // Inizializzazione
+    let event = JSON.parse(localStorage.getItem('event')) || null;
+    let contributions = JSON.parse(localStorage.getItem('contributions')) || [];
+    const categories = ['Intrattenimento', 'Posateria', 'Antipasti', 'Primi', 'Secondi', 'Dolci/Frutta', 'Bevande'];
+    const correctPassword = 'TuttiIFruttiSummerLove';
+    let editingContributionEmail = null; // Tiene traccia dell'email del contributo in modifica
+
+    // Carica evento e contributi all'avvio
+    if (event) {
+      document.getElementById('eventDetails').classList.remove('hidden');
+      document.getElementById('eventInfo').innerText = `${event.name} | ${event.date} | ${event.location} | ${event.guests} ospiti`;
+    }
+    renderContributions();
+
+    // Sblocca form evento
+    function unlockEventForm() {
+      const password = document.getElementById('passwordInput').value;
+      const passwordError = document.getElementById('passwordError');
+      if (password === correctPassword) {
+        document.getElementById('passwordSection').classList.add('hidden');
+        document.getElementById('eventFormSection').classList.remove('hidden');
+        passwordError.classList.add('hidden');
+        if (event) {
+          document.getElementById('eventFormTitle').innerText = 'Modifica Evento';
+          document.getElementById('eventName').value = event.name;
+          document.getElementById('eventDate').value = event.date;
+          document.getElementById('eventLocation').value = event.location;
+          document.getElementById('eventGuests').value = event.guests;
+        }
+      } else {
+        passwordError.classList.remove('hidden');
+      }
+    }
+
+    // Salva evento
+    function saveEvent() {
+      const name = document.getElementById('eventName').value;
+      const date = document.getElementById('eventDate').value;
+      const location = document.getElementById('eventLocation').value;
+      const guests = document.getElementById('eventGuests').value;
+
+      if (!name || !date || !location || !guests) {
+        alert('Compila tutti i campi dell\'evento!');
+        return;
+      }
+
+      event = { name, date, location, guests };
+      localStorage.setItem('event', JSON.stringify(event));
+      document.getElementById('eventDetails').classList.remove('hidden');
+      document.getElementById('eventInfo').innerText = `${name} | ${date} | ${location} | ${guests} ospiti`;
+      document.getElementById('eventFormSection').classList.add('hidden');
+      document.getElementById('passwordSection').classList.remove('hidden');
+      document.getElementById('passwordInput').value = '';
+    }
+
+    // Avvia modifica contributo
+    function startEditContribution(email) {
+      editingContributionEmail = email;
+      document.getElementById('emailVerificationSection').classList.remove('hidden');
+      document.getElementById('verifyEmailInput').value = '';
+      document.getElementById('emailError').classList.add('hidden');
+    }
+
+    // Verifica email per modifica
+    function verifyEmailForEdit() {
+      const inputEmail = document.getElementById('verifyEmailInput').value;
+      const emailError = document.getElementById('emailError');
+      const contribution = contributions.find(c => c.email === editingContributionEmail);
+
+      if (inputEmail === editingContributionEmail && contribution) {
+        document.getElementById('emailVerificationSection').classList.add('hidden');
+        document.getElementById('contributionFormTitle').innerText = 'Modifica Contributo';
+        document.getElementById('contributionButton').innerText = 'Salva Modifica';
+        document.getElementById('userEmail').value = contribution.email;
+        document.getElementById('userName').value = contribution.name;
+        document.getElementById('category').value = contribution.category;
+        document.getElementById('contribution').value = contribution.contribution;
+        document.getElementById('vegan').checked = contribution.vegan;
+        document.getElementById('glutenFree').checked = contribution.glutenFree;
+        // Nota: non si può prepopolare il campo file per motivi di sicurezza del browser
+      } else {
+        emailError.classList.remove('hidden');
+      }
+    }
+
+    // Aggiungi o modifica contributo
+    function addOrUpdateContribution() {
+      const email = document.getElementById('userEmail').value;
+      const name = document.getElementById('userName').value;
+      const category = document.getElementById('category').value;
+      const contribution = document.getElementById('contribution').value;
+      const vegan = document.getElementById('vegan').checked;
+      const glutenFree = document.getElementById('glutenFree').checked;
+      const photoInput = document.getElementById('userPhoto');
+
+      if (!email || !name || !contribution) {
+        alert('Compila email, nome e contributo!');
+        return;
+      }
+
+      // Gestione foto
+      const handleContribution = (photo) => {
+        if (editingContributionEmail) {
+          // Modifica contributo esistente
+          const index = contributions.findIndex(c => c.email === editingContributionEmail);
+          if (index !== -1) {
+            contributions[index] = {
+              email,
+              name,
+              photo: photo || contributions[index].photo, // Mantieni la foto esistente se non caricata
+              category,
+              contribution,
+              vegan,
+              glutenFree
+            };
+          }
+          editingContributionEmail = null;
+          document.getElementById('contributionFormTitle').innerText = 'Aggiungi il tuo Contributo';
+          document.getElementById('contributionButton').innerText = 'Aggiungi Contributo';
+        } else {
+          // Aggiungi nuovo contributo
+          contributions.push({ email, name, photo: photo || 'https://via.placeholder.com/40', category, contribution, vegan, glutenFree });
+        }
+        localStorage.setItem('contributions', JSON.stringify(contributions));
+        renderContributions();
+        resetContributionForm();
+      };
+
+      if (photoInput.files && photoInput.files[0]) {
+        const reader = new FileReader();
+        reader.onload = function (e) {
+          handleContribution(e.target.result);
+        };
+        reader.readAsDataURL(photoInput.files[0]);
+      } else {
+        handleContribution();
+      }
+    }
+
+    // Resetta form contributo
+    function resetContributionForm() {
+      document.getElementById('userEmail').value = '';
+      document.getElementById('userName').value = '';
+      document.getElementById('userPhoto').value = '';
+      document.getElementById('contribution').value = '';
+      document.getElementById('vegan').checked = false;
+      document.getElementById('glutenFree').checked = false;
+    }
+
+    // Render contributi
+    function renderContributions() {
+      const contributionList = document.getElementById('contributionList');
+      contributionList.innerHTML = '';
+
+      categories.forEach(category => {
+        const categoryContributions = contributions.filter(c => c.category === category);
+        if (categoryContributions.length > 0) {
+          const categoryDiv = document.createElement('div');
+          categoryDiv.className = 'category-section';
+          categoryDiv.innerHTML = `<h3 class="text-lg font-semibold text-indigo-600">${category}</h3>`;
+          const grid = document.createElement('div');
+          grid.className = 'grid grid-cols-1 sm:grid-cols-2 gap-4 mt-2';
+
+          categoryContributions.forEach(contribution => {
+            const card = document.createElement('div');
+            card.className = 'contribution-card bg-gray-50 p-4 rounded-lg shadow';
+            card.innerHTML = `
+              <div class="flex items-center gap-3">
+                <img src="${contribution.photo}" alt="Profilo" class="w-10 h-10 rounded-full object-cover">
+                <div>
+                  <p class="font-semibold">${contribution.name}</p>
+                  <p>${contribution.contribution}</p>
+                  <p class="text-sm text-gray-600">
+                    ${contribution.vegan ? '🌱 Vegano' : ''} ${contribution.glutenFree ? '🌾 Senza glutine' : ''}
+                  </p>
+                  <button onclick="startEditContribution('${contribution.email}')" class="mt-2 text-indigo-600 hover:underline text-sm">Modifica</button>
+                </div>
+              </div>
+            `;
+            grid.appendChild(card);
+          });
+
+          categoryDiv.appendChild(grid);
+          contributionList.appendChild(categoryDiv);
+        }
+      });
+    }
+  </script>
+</body>
+</html>
